@@ -6,8 +6,8 @@ risk level into a readable narrative, compliance observations, security
 risks, and remediation steps. Falls back to a deterministic rule-based
 summary if no LLM key is configured, so the app is fully usable offline.
 """
-
 from typing import Dict, Any, List
+
 from backend.config import GROQ_API_KEY, GROQ_MODEL
 
 CATEGORY_LABELS = {
@@ -59,13 +59,10 @@ def _rule_based_summary(breakdown: Dict[str, int], risk_level: str) -> Dict[str,
         remediation.append("No immediate action required; periodic re-scanning is still recommended.")
 
     narrative = (
-        f"The uploaded document has been classified as "
-        f"{risk_level.upper()} risk after detecting "
-        f"{sum(breakdown.values())} sensitive data instance(s) "
-        f"across {len(breakdown)} category(ies). "
-        "Review the detected information and apply the "
-        "recommended remediation before sharing or storing "
-        "the document."
+        f"This document was classified as {risk_level} risk based on {sum(breakdown.values())} "
+        f"sensitive data instance(s) across {len(breakdown)} categor{'y' if len(breakdown)==1 else 'ies'}. "
+        "Review the detection breakdown and apply the suggested remediation steps before sharing "
+        "this document outside its intended audience."
     )
 
     return {
@@ -77,8 +74,9 @@ def _rule_based_summary(breakdown: Dict[str, int], risk_level: str) -> Dict[str,
 
 
 def _llm_summary(breakdown: Dict[str, int], risk_level: str, masked_preview: str) -> Dict[str, Any]:
-    from groq import Groq
-    client = Groq(api_key=GROQ_API_KEY)
+    import json
+    from langchain_groq import ChatGroq
+    from langchain_core.prompts import ChatPromptTemplate
 
     breakdown_text = "\n".join(f"- {CATEGORY_LABELS.get(c, c)}: {n}" for c, n in breakdown.items()) or "None detected"
 
@@ -87,27 +85,37 @@ def _llm_summary(breakdown: Dict[str, int], risk_level: str, masked_preview: str
         "detection breakdown and a masked document preview, produce a JSON object "
         "with EXACTLY these keys: compliance_observations (list of strings), "
         "security_risks (list of strings), remediation_steps (list of strings), "
-        "narrative (a short paragraph). Do not include any text outside the JSON. "
-        "Never speculate about unmasked values."
-    )
-    user_prompt = (
-        f"Risk level: {risk_level}\n\n"
-        f"Detected data breakdown:\n{breakdown_text}\n\n"
-        f"Masked document preview (first 1500 chars):\n{masked_preview[:1500]}"
+        "narrative (a short paragraph). Respond with ONLY the JSON object — no "
+        "markdown fences, no text outside the JSON. Never speculate about "
+        "unmasked values."
     )
 
-    completion = client.chat.completions.create(
-        model=GROQ_MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        temperature=0.3,
-        max_tokens=800,
-        response_format={"type": "json_object"},
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", system_prompt),
+        ("human",
+         "Risk level: {risk_level}\n\n"
+         "Detected data breakdown:\n{breakdown_text}\n\n"
+         "Masked document preview (first 1500 chars):\n{preview}"),
+    ])
+
+    llm = ChatGroq(
+        api_key=GROQ_API_KEY, model=GROQ_MODEL, temperature=0.3, max_tokens=800,
+        model_kwargs={"response_format": {"type": "json_object"}},
     )
-    import json
-    return json.loads(completion.choices[0].message.content)
+
+    chain = prompt | llm
+    result = chain.invoke({
+        "risk_level": risk_level,
+        "breakdown_text": breakdown_text,
+        "preview": masked_preview[:1500],
+    })
+
+    raw = result.content.strip()
+    # Defensive cleanup in case the model wraps the JSON in ```json fences anyway.
+    if raw.startswith("```"):
+        raw = raw.strip("`")
+        raw = raw[4:] if raw.lower().startswith("json") else raw
+    return json.loads(raw)
 
 
 def generate_summary(breakdown: Dict[str, int], risk_level: str, masked_preview: str) -> Dict[str, Any]:

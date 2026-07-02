@@ -11,3 +11,10 @@ numpy
 groq
 python-dotenv
 requests
+# LangChain (RAG pipeline: chunking, embeddings, vector store, LLM chain)
+langchain
+langchain-community
+langchain-core
+langchain-groq
+langchain-huggingface
+langchain-text-splitters

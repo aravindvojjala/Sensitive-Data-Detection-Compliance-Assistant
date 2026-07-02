@@ -5,12 +5,13 @@ sensitive/confidential information, classifies risk, generates a
 compliance summary, and answers questions about the document using RAG.
 
 **Stack:** FastAPI (backend/API) + Streamlit (frontend UI) + regex/rule-based
-PII detection + sentence-transformers & FAISS (RAG) + Groq LLM (optional,
-for summaries and answers) + Docker.
+PII detection + LangChain (chunking, FAISS vectorstore, embeddings, LLM
+orchestration) + Groq LLM (optional, for summaries and answers) + Docker.
 
 ---
 
 ## 1. Architecture Overview
+
 
 ```
 ┌─────────────────┐        HTTP (JSON)         ┌──────────────────────┐
@@ -42,11 +43,13 @@ for summaries and answers) + Docker.
 **Key design decision:** detection is done with deterministic regex + Luhn
 validation (not an LLM) so results are explainable, reproducible, and fast
 — critical for a compliance tool where you must be able to say *exactly*
-why something was flagged. The LLM (Groq, optional) is used only for the
-"soft" tasks: turning the detection breakdown into a readable narrative,
-and answering free-form questions over the (already masked) document.
-If no LLM key is configured, the app still fully works using rule-based
-summaries and extractive Q&A.
+why something was flagged. LangChain (via Groq, optional) is used only for
+the "soft" tasks: turning the detection breakdown into a readable
+narrative, and answering free-form questions over the (already masked)
+document through a retrieval chain. If no LLM key is configured, the app
+still fully works using rule-based summaries and extractive Q&A (no
+LangChain LLM call is made in that mode — only the local embeddings +
+FAISS retrieval still run).
 
 ---
 
@@ -94,8 +97,9 @@ sensitive-data-compliance-assistant/
   fallbacks and still works end-to-end.
 
 ### Step 2 — Get a copy of the project
-Unzip the project you downloaded, or clone it if you pushed it to GitHub:
+Clone it if you pushed it to GitHub:
 ```bash
+git clone https://github.com/aravindvojjala/Sensitive-Data-Detection-Compliance-Assistant
 cd sensitive-data-compliance-assistant
 ```
 
@@ -179,10 +183,13 @@ by FastAPI at `/docs` once the backend is running.
    compliance observations, security risks, and remediation steps, either
    via the Groq LLM (grounded in the masked document + detection
    breakdown) or a deterministic rule-based generator if no LLM key is set.
-5. **Question Answering** — `rag/qa_engine.py` chunks the *masked* document,
-   embeds chunks locally with `sentence-transformers`, indexes them in
-   FAISS, retrieves top-K relevant chunks per question, and (if configured)
-   asks Groq to answer using only those excerpts.
+5. **Question Answering** — `rag/qa_engine.py` uses LangChain end-to-end:
+   `RecursiveCharacterTextSplitter` chunks the *masked* document,
+   `HuggingFaceEmbeddings` embeds chunks locally, a LangChain `FAISS`
+   vectorstore indexes and persists them per document, `similarity_search`
+   retrieves the top-K relevant chunks per question, and an LCEL chain
+   (`ChatPromptTemplate | ChatGroq | StrOutputParser`) generates the answer
+   grounded in only those excerpts (if `GROQ_API_KEY` is configured).
 6. **Interface** — FastAPI backend + Streamlit frontend, communicating over
    HTTP/JSON, as requested.
 
@@ -226,9 +233,10 @@ by FastAPI at `/docs` once the backend is running.
 - **Add a new sensitive-data type:** add a pattern to `PATTERNS` in
   `detectors/pii_detector.py`, a weight in `config.RISK_WEIGHTS`, and a
   label/remediation tip in `classifiers/summary_generator.py`.
-- **Swap the LLM provider:** replace the Groq client calls in
-  `rag/qa_engine.py` / `classifiers/summary_generator.py` with
-  OpenAI/Gemini/HuggingFace equivalents — the rest of the pipeline is
-  provider-agnostic.
+- **Swap the LLM provider:** LangChain makes this a one-line change — swap
+  `ChatGroq` in `rag/qa_engine.py` / `classifiers/summary_generator.py` for
+  `ChatOpenAI`, `ChatGoogleGenerativeAI`, or any other LangChain chat model
+  class; the prompt templates, chains, and the rest of the pipeline stay
+  the same.
 - **Add OCR:** extend `utils/file_parser.py`'s `_read_pdf` to fall back to
   `pytesseract` when `page.extract_text()` returns empty text.
