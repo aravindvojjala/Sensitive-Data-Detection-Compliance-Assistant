@@ -1,0 +1,65 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environments
+venv/
+env/
+.venv/
+py313env/
+
+# Environment Variables
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs
+*.log
+
+# Uploaded Files
+uploads/*
+!uploads/.gitkeep
+
+# FAISS Indexes
+uploads/_indexes/*
+!uploads/_indexes/.gitkeep
+
+# Audit Logs
+audit/*
+!audit/.gitkeep
+
+# Model Cache
+.cache/
+huggingface/
+.huggingface/
+models/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# Pytest
+.pytest_cache/
+
+# Coverage
+.coverage
+htmlcov/
+
+# Temporary
+*.tmp
+*.bak

@@ -1,0 +1,30 @@
+CONFIDENTIAL - INTERNAL USE ONLY
+
+Employee Onboarding Record
+---------------------------
+Employee ID: EMP10234
+Name: Rahul Sharma
+Email: rahul.sharma@examplecorp.com
+Phone: +91 9876543210
+Aadhaar Number: 2345 6789 1234
+PAN Number: ABCDE1234F
+
+Payroll Details
+----------------
+Bank Account Number: 123456789012
+IFSC Code: HDFC0001234
+Credit Card on file (for reimbursements): 4539 1488 0343 6467
+
+System Access
+--------------
+API Key: sk-abc123examplekeydonotuse4567890
+Password: SuperSecret123!
+
+Notes
+------
+This document contains proprietary compensation bands and must not be
+distributed outside the HR department. Trade secret compensation
+formulas are discussed in Appendix B (not included here).
+
+Contact HR at hr-team@examplecorp.com for questions, or reach the
+backup coordinator at 9123456780.
